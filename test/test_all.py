@@ -251,7 +251,8 @@ class ExampleJitter(Example):
     - script path begins with "jitter/"
     """
     example_dir = "jitter"
-    jitter_engines = ["tcc", "llvm", "python"]
+    jitter_engines = ["python"]
+	#jitter_engines = ["tcc", "llvm", "python"]
 
 
 for jitter in ExampleJitter.jitter_engines:

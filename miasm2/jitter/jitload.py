@@ -130,7 +130,7 @@ class jitter:
 
     "Main class for JIT handling"
 
-    def __init__(self, ir_arch, jit_type="tcc"):
+    def __init__(self, ir_arch, jit_type="python"):
         """Init an instance of jitter.
         @ir_arch: ir instance for this architecture
         @jit_type: JiT backend to use. Available options are:
