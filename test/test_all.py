@@ -1,6 +1,7 @@
 import argparse
 import time
 import os
+import sys
 
 from utils.test import Test
 from utils.testset import TestSet
@@ -298,8 +299,10 @@ class ExampleJitter(Example):
     - script path begins with "jitter/"
     """
     example_dir = "jitter"
-    jitter_engines = ["python"]
-	#jitter_engines = ["tcc", "llvm", "python"]
+    jitter_engines = ["tcc", "llvm", "python"]
+    # Currently the only jitter for OS X is python
+    if sys.platform == "darwin":
+        jitter_engines = ["python"]
 
 
 for jitter in ExampleJitter.jitter_engines:
@@ -349,6 +352,10 @@ By default, no tag is ommited." % ", ".join(TAGS.keys()), default="")
     ## Parse multiproc argument
     multiproc = True
     if args.mono is True or args.coverage is True:
+        multiproc = False
+
+    # Disable multiproc on OS X for now
+    if sys.platform == 'darwin':
         multiproc = False
 
     ## Parse ommit-tags argument
