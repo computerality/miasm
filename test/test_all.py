@@ -42,6 +42,54 @@ for script in ["x86/sem.py",
                "mips32/arch.py",
                ]:
     testset += RegressionTest([script], base_dir="arch")
+
+
+## Semantic
+class SemanticTestAsm(RegressionTest):
+    """Assemble an asm file"""
+
+    shellcode_script = os.path.join("..", "example", "asm", "shellcode.py")
+    container_dct = {"PE": "--PE"}
+
+    def __init__(self, arch, container, *args, **kwargs):
+        super(SemanticTestAsm, self).__init__(*args, **kwargs)
+        sample_dir = os.path.join("samples", arch)
+        base_filename = os.path.join(sample_dir, self.command_line[0])
+        input_filename = base_filename + ".S"
+        output_filename = base_filename + ".bin"
+        self.command_line = [self.shellcode_script,
+                             arch,
+                             input_filename,
+                             output_filename,
+                             self.container_dct.get(container, '')]
+        self.products = [output_filename, "graph.txt"]
+
+
+class SemanticTestExec(RegressionTest):
+    """Execute a binary file"""
+
+    launcher_dct = {("PE", "x86_64"): "sandbox_pe_x86_64.py"}
+    launcher_base = os.path.join("..", "example", "jitter")
+
+    def __init__(self, arch, container, address, *args, **kwargs):
+        super(SemanticTestExec, self).__init__(*args, **kwargs)
+        sample_dir = os.path.join("samples", arch)
+        base_filename = os.path.join(sample_dir, self.command_line[0])
+        input_filename = base_filename + ".bin"
+        launcher = os.path.join(self.launcher_base,
+                                self.launcher_dct[(container, arch)])
+        self.command_line = [launcher,
+                             input_filename,
+                             "-a", hex(address)]
+        self.products = []
+
+
+
+test_x86_64_mul_div = SemanticTestAsm("x86_64", "PE", ["mul_div"])
+testset += test_x86_64_mul_div
+testset += SemanticTestExec("x86_64", "PE", 0x401000, ["mul_div"],
+                            depends=[test_x86_64_mul_div])
+
 ## Core
 for script in ["interval.py",
                "graph.py",
@@ -116,11 +164,10 @@ class ExampleShellcode(ExampleAssembler):
                              self.command_line[3:]
         self.products = [self.command_line[3], "graph.txt"]
 
-
 testset += ExampleShellcode(['x86_32', 'x86_32_manip_ptr.S', "demo_x86_32.bin"])
 
 test_box = {}
-test_box_names = ["mod", "mod_self", "repmod", "simple", "enc"]
+test_box_names = ["mod", "mod_self", "repmod", "simple", "enc", "pop_esp"]
 for source in test_box_names:
     sample_base = "x86_32_" + source
     args = ["x86_32", sample_base + ".S", sample_base + ".bin", "--PE"]

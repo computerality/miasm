@@ -5,7 +5,8 @@ import logging
 
 from miasm2.ir.symbexec import symbexec
 from miasm2.core.graph import DiGraph
-from miasm2.expression.expression import *
+from miasm2.expression.expression \
+    import ExprAff, ExprCond, ExprId, ExprInt, ExprMem, ExprOp
 
 log = logging.getLogger("analysis")
 console_handler = logging.StreamHandler()
@@ -321,8 +322,6 @@ class ira:
                 eqs.append(ExprAff(n_w, v))
             print '*' * 40
             print irb
-            for eq in eqs:
-                eq
             irb.irs = [eqs]
             irb.lines = [None]
 

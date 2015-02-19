@@ -6,8 +6,8 @@ from miasm2.expression.expression import *
 from pyparsing import *
 from miasm2.core.cpu import *
 from collections import defaultdict
-import regs as regs_module
-from regs import *
+import miasm2.arch.x86.regs as regs_module
+from miasm2.arch.x86.regs import *
 from miasm2.ir.ir import *
 
 log = logging.getLogger("x86_arch")
@@ -20,8 +20,10 @@ conditional_branch = ["JO", "JNO", "JB", "JAE",
                       "JZ", "JNZ", "JBE", "JA",
                       "JS", "JNS", "JPE", "JNP",
                       #"L", "NL", "NG", "G"]
-                      "JL", "JGE", "JLE", "JG"]
-unconditional_branch = ['JMP']
+                      "JL", "JGE", "JLE", "JG",
+                      "JCXZ", "JECXZ", "JRCXZ"]
+
+unconditional_branch = ['JMP', 'JMPF']
 
 f_isad = "AD"
 f_s08 = "S08"
@@ -913,7 +915,6 @@ class mn_x86(cls_mn):
 
     def getnextflow(self, symbol_pool):
         raise NotImplementedError('not fully functional')
-        return self.offset + 4
 
     def ir_pre_instruction(self):
         return [ExprAff(mRIP[self.mode],
@@ -952,8 +953,8 @@ class mn_x86(cls_mn):
         for c, v in candidates:
             if v_opmode(c) != instr.mode:
                 cand_diff_mode += v
-        cand_same_mode.sort(key=lambda x: len(x))
-        cand_diff_mode.sort(key=lambda x: len(x))
+        cand_same_mode.sort(key=len)
+        cand_diff_mode.sort(key=len)
         return cand_same_mode + cand_diff_mode
 
 
@@ -2563,15 +2564,15 @@ class bs_cl1(bsi, m_arg):
 
 
 def sib_cond(cls, mode, v):
-        if admode_prefix((mode, v["opmode"], v["admode"])) == 16:
-            return None
-        if v['mod'] == 0b11:
-            return None
-        elif v['rm'] == 0b100:
-            return cls.ll
-        else:
-            return None
-        return v['rm'] == 0b100
+    if admode_prefix((mode, v["opmode"], v["admode"])) == 16:
+        return None
+    if v['mod'] == 0b11:
+        return None
+    elif v['rm'] == 0b100:
+        return cls.ll
+    else:
+        return None
+    return v['rm'] == 0b100
 
 
 class bs_cond_scale(bs_cond):
@@ -2587,7 +2588,7 @@ class bs_cond_scale(bs_cond):
             self.value = 0
             self.l = 0
             return True
-        return super(bs_cond, self).encode()
+        return super(bs_cond_scale, self).encode()
 
     def decode(self, v):
         self.value = v

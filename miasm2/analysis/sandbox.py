@@ -1,11 +1,11 @@
-import os, sys
 import logging
 from argparse import ArgumentParser
+
 from miasm2.analysis.machine import Machine
-from miasm2.os_dep import win_api_x86_32, win_api_x86_32_seh
+from miasm2.os_dep import win_api_x86_32_seh
 from miasm2.jitter.csts import PAGE_READ, PAGE_WRITE
 from miasm2.analysis import debugging
-from miasm2.jitter.loader.utils import libimp
+from miasm2.jitter.jitload import log_func
 
 class Sandbox(object):
     """
@@ -14,7 +14,6 @@ class Sandbox(object):
 
     @staticmethod
     def code_sentinelle(jitter):
-        print 'Emulation stop'
         jitter.run = False
         return False
 
@@ -57,7 +56,7 @@ class Sandbox(object):
             self.jitter.jit.log_regs = True
 
         if not self.options.quiet_function_calls:
-            self.machine.log_jit.setLevel(logging.DEBUG)
+            log_func.setLevel(logging.INFO)
 
         if self.options.dumpblocs:
             self.jitter.jit.log_newbloc = True
@@ -117,9 +116,8 @@ class Sandbox(object):
                 cmd.cmdloop()
 
         else:
-            print "Start emulation", hex(addr)
             self.jitter.init_run(addr)
-            print self.jitter.continue_run()
+            self.jitter.continue_run()
 
 
 class OS(object):
@@ -263,13 +261,12 @@ class OS_Linux_str(OS):
         parser.add_argument("load_base_addr", help="load base address")
 
 
-
-class Arch_x86_32(Arch):
-    _ARCH_ = "x86_32"
+class Arch_x86(Arch):
+    _ARCH_ = None # Arch name
     STACK_SIZE = 0x100000
 
     def __init__(self):
-        super(Arch_x86_32, self).__init__()
+        super(Arch_x86, self).__init__()
 
         if self.options.usesegm:
             self.jitter.ir_arch.do_stk_segm=  True
@@ -285,7 +282,15 @@ class Arch_x86_32(Arch):
     @classmethod
     def update_parser(cls, parser):
         parser.add_argument('-s', "--usesegm", action="store_true",
-                          help="Use segments fs:")
+                          help="Use segments")
+
+
+class Arch_x86_32(Arch_x86):
+    _ARCH_ = "x86_32"
+
+
+class Arch_x86_64(Arch_x86):
+    _ARCH_ = "x86_64"
 
 
 class Arch_arml(Arch):
@@ -334,6 +339,31 @@ class Sandbox_Win_x86_32(Sandbox, Arch_x86_32, OS_Win):
         if addr is None and self.options.address is None:
             addr = self.entry_point
         super(Sandbox_Win_x86_32, self).run(addr)
+
+
+class Sandbox_Win_x86_64(Sandbox, Arch_x86_64, OS_Win):
+
+    def __init__(self, *args, **kwargs):
+        Sandbox.__init__(self, *args, **kwargs)
+
+        # reserve stack for local reg
+        for i in xrange(0x4):
+            self.jitter.push_uint64_t(0)
+
+        # Pre-stack some arguments
+        self.jitter.push_uint64_t(0x1337beef)
+
+        # Set the runtime guard
+        self.jitter.add_breakpoint(0x1337beef, self.__class__.code_sentinelle)
+
+
+    def run(self, addr = None):
+        """
+        If addr is not set, use entrypoint
+        """
+        if addr is None and self.options.address is None:
+            addr = self.entry_point
+        super(Sandbox_Win_x86_64, self).run(addr)
 
 
 class Sandbox_Linux_x86_32(Sandbox, Arch_x86_32, OS_Linux):
