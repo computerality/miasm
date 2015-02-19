@@ -31,8 +31,11 @@ def symb_exec(interm, inputstate, debug):
         for k, v in symexec.symbols.items():
             if regs_init.get(k, None) != v:
                 print k, v
-    return {k: v for k, v in symexec.symbols.items()
-            if k not in EXCLUDE_REGS and regs_init.get(k, None) != v}
+    d = {}
+    for k, v in symexec.symbols.items():
+        if k not in EXCLUDE_REGS and regs_init.get(k, None) != v:
+            d[k] = v
+    return d
 
 def compute(ir, mode, asm, inputstate={}, debug=False):
     instr = mn.fromstring(asm, mode)

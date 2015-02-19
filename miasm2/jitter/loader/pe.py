@@ -211,8 +211,10 @@ def vm_load_pe_libs(vm, libs_name, libs, lib_path_base="win_dll", **kargs):
     Return a dictionnary Filename -> PE instances
     Extra arguments are passed to vm_load_pe_lib
     """
-    return {fname: vm_load_pe_lib(vm, fname, libs, lib_path_base, **kargs)
-            for fname in libs_name}
+    libs = {}
+    for fname in libs_name:
+        libs[fname] = vm_load_pe_lib(vm, fname, libs, lib_path_base, **kargs)
+    return libs
 
 
 def vm_fix_imports_pe_libs(lib_imgs, libs, lib_path_base="win_dll",
@@ -367,7 +369,10 @@ class libimp_pe(libimp):
             # Get fixed addresses
             out_ads = dict() # addr -> func_name
             for func_name, dst_addresses in self.lib_imp2dstad[ad].items():
-                out_ads.update({addr:func_name for addr in dst_addresses})
+                address_map = {}
+                for addr in dst_addresses:
+                    address_map[addr] = func_name
+                out_ads.update(address_map)
 
             # Filter available addresses according to @flt
             all_ads = [addr for addr in out_ads.keys() if flt(addr)]

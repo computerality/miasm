@@ -18,8 +18,10 @@ expr = ExprRandom_OpSubRange.get(depth=8)
 print "-> %s" % expr
 print
 
-target_exprs = {lang:Translator.to_language(lang).from_expr(expr)
-                for lang in Translator.available_languages()}
+target_exprs = {}
+for lang in Translator.available_languages():
+    target_exprs[lang] = Translator.to_language(lang).from_expr(expr)
+
 for target_lang, target_expr in target_exprs.iteritems():
     print "[+] Translate in %s:" % target_lang
     print target_expr

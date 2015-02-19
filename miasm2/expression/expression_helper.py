@@ -24,6 +24,12 @@ import string
 
 import miasm2.expression.expression as m2_expr
 
+# try importing OrderedDict with fallback for python2.6
+try:
+    from itertools import OrderedDict
+except:
+    from ordereddict import OrderedDict
+
 
 def parity(a):
     tmp = (a) & 0xFFL
@@ -235,9 +241,10 @@ class Variables_Identifier(object):
                 cur = var_value
 
                 # Do not replace with itself
-                to_replace = {v_val:v_id
-                              for v_id, v_val in self._vars.iteritems()
-                              if v_id != var_id}
+                to_replace = {}
+                for (v_id, v_val) in self._vars.iteritems():
+                        if v_id != var_id:
+                            to_replace[v_val] = v_id
                 var_value = var_value.replace_expr(to_replace)
 
                 if cur != var_value:
@@ -247,11 +254,13 @@ class Variables_Identifier(object):
                     break
 
         # Replace in the original equation
-        self._equation = expr.replace_expr({v_val: v_id for v_id, v_val
-                                            in self._vars.iteritems()})
+        to_replace = {}
+        for (v_id, v_val) in self._vars.iteritems():
+            to_replace[v_val] = v_id
+        self._equation = expr.replace_expr(to_replace)
 
         # Compute variables dependencies
-        self._vars_ordered = collections.OrderedDict()
+        self._vars_ordered = OrderedDict()
         todo = set(self._vars.iterkeys())
         needs = {}
 

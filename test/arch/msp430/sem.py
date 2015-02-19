@@ -19,7 +19,10 @@ def M(addr):
 
 def compute(asm, inputstate={}, debug=False):
     sympool = dict(regs_init)
-    sympool.update({k: ExprInt_from(k, v) for k, v in inputstate.iteritems()})
+    d = {}
+    for k, v in inputstate.iteritems():
+        d[k] = ExprInt_from(k, v)
+    sympool.update(d)
     interm = ir_arch()
     symexec = symbexec(interm, sympool)
     instr = mn.fromstring(asm, mode)
