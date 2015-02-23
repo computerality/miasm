@@ -69,7 +69,9 @@ class SemanticTestAsm(RegressionTest):
 class SemanticTestExec(RegressionTest):
     """Execute a binary file"""
 
-    launcher_dct = {("PE", "x86_64"): "sandbox_pe_x86_64.py"}
+    launcher_dct = {("PE", "x86_64"): "sandbox_pe_x86_64.py",
+                    ("PE", "x86_32"): "sandbox_pe_x86_32.py",
+                }
     launcher_base = os.path.join("..", "example", "jitter")
 
     def __init__(self, arch, container, address, *args, **kwargs):
@@ -87,9 +89,13 @@ class SemanticTestExec(RegressionTest):
 
 
 test_x86_64_mul_div = SemanticTestAsm("x86_64", "PE", ["mul_div"])
+test_x86_32_bsr_bsf = SemanticTestAsm("x86_32", "PE", ["bsr_bsf"])
 testset += test_x86_64_mul_div
+testset += test_x86_32_bsr_bsf
 testset += SemanticTestExec("x86_64", "PE", 0x401000, ["mul_div"],
                             depends=[test_x86_64_mul_div])
+testset += SemanticTestExec("x86_32", "PE", 0x401000, ["bsr_bsf"],
+                            depends=[test_x86_32_bsr_bsf])
 
 ## Core
 for script in ["interval.py",
@@ -115,6 +121,25 @@ testset += RegressionTest(["z3_ir.py"], base_dir="ir/translators",
 for script in ["win_api_x86_32.py",
                ]:
     testset += RegressionTest([script], base_dir="os_dep")
+
+## Analysis
+testset += RegressionTest(["depgraph.py"], base_dir="analysis",
+                          products=["graph_test_01_00.dot",
+                                    "graph_test_02_00.dot",
+                                    "graph_test_02_01.dot",
+                                    "graph_test_03_00.dot",
+                                    "graph_test_03_01.dot",
+                                    "graph_test_04_00.dot",
+                                    "graph_test_05_00.dot",
+                                    "graph_test_06_00.dot",
+                                    "graph_test_07_00.dot",
+                                    "graph_test_08_00.dot",
+                                    "graph_test_08_01.dot",
+                                    "graph_test_09_00.dot",
+                                    "graph_test_09_01.dot",
+                                    "graph_test_10_00.dot",
+                                    ] + ["graph_%02d.dot" % test_nb
+                                         for test_nb in xrange(1, 11)])
 
 # Examples
 class Example(Test):

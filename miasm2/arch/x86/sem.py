@@ -970,7 +970,7 @@ def popfd(ir, instr):
 
 
 def popfw(ir, instr):
-    tmp = m2_expr.ExprMem(esp)
+    tmp = m2_expr.ExprMem(mRSP[instr.mode])
     e = []
     e.append(m2_expr.ExprAff(cf, m2_expr.ExprSlice(tmp, 0, 1)))
     e.append(m2_expr.ExprAff(pf, m2_expr.ExprSlice(tmp, 2, 3)))
@@ -983,7 +983,7 @@ def popfw(ir, instr):
     e.append(m2_expr.ExprAff(of, m2_expr.ExprSlice(tmp, 11, 12)))
     e.append(m2_expr.ExprAff(iopl, m2_expr.ExprSlice(tmp, 12, 14)))
     e.append(m2_expr.ExprAff(nt, m2_expr.ExprSlice(tmp, 14, 15)))
-    e.append(m2_expr.ExprAff(esp, esp + m2_expr.ExprInt32(2)))
+    e.append(m2_expr.ExprAff(mRSP[instr.mode], mRSP[instr.mode] + m2_expr.ExprInt_fromsize(mRSP[instr.mode].size, 2)))
     return e, []
 
 
@@ -2496,32 +2496,41 @@ def aas(ir, instr, ):
     return e, []
 
 
+def bsr_bsf(ir, instr, a, b, op_name):
+    """
+    IF SRC == 0
+        ZF = 1
+        DEST is left unchanged
+    ELSE
+        ZF = 0
+        DEST = @op_name(SRC)
+    """
+    lbl_src_null = m2_expr.ExprId(ir.gen_label(), instr.mode)
+    lbl_src_not_null = m2_expr.ExprId(ir.gen_label(), instr.mode)
+    lbl_next = m2_expr.ExprId(ir.get_next_label(instr), instr.mode)
+
+    aff_dst = m2_expr.ExprAff(ir.IRDst, lbl_next)
+    e = [m2_expr.ExprAff(ir.IRDst, m2_expr.ExprCond(b,
+                                                    lbl_src_not_null,
+                                                    lbl_src_null))]
+    e_src_null = []
+    e_src_null.append(m2_expr.ExprAff(zf, m2_expr.ExprInt_from(zf, 1)))
+    # XXX destination is undefined
+    e_src_null.append(aff_dst)
+
+    e_src_not_null = []
+    e_src_not_null.append(m2_expr.ExprAff(zf, m2_expr.ExprInt_from(zf, 0)))
+    e_src_not_null.append(m2_expr.ExprAff(a, m2_expr.ExprOp(op_name, b)))
+    e_src_not_null.append(aff_dst)
+
+    return e, [irbloc(lbl_src_null.name, [e_src_null]),
+               irbloc(lbl_src_not_null.name, [e_src_not_null])]
+
 def bsf(ir, instr, a, b):
-    lbl_do = m2_expr.ExprId(ir.gen_label(), instr.mode)
-    lbl_skip = m2_expr.ExprId(ir.get_next_label(instr), instr.mode)
-
-    e = [m2_expr.ExprAff(zf, m2_expr.ExprCond(b, m2_expr.ExprInt_from(zf, 0),
-                                              m2_expr.ExprInt_from(zf, 1)))]
-
-    e_do = []
-    e_do.append(m2_expr.ExprAff(a, m2_expr.ExprOp('bsf', b)))
-    e_do.append(m2_expr.ExprAff(ir.IRDst, lbl_skip))
-    e.append(m2_expr.ExprAff(ir.IRDst, m2_expr.ExprCond(b, lbl_do, lbl_skip)))
-    return e, [irbloc(lbl_do.name, [e_do])]
-
+    return bsr_bsf(ir, instr, a, b, "bsf")
 
 def bsr(ir, instr, a, b):
-    lbl_do = m2_expr.ExprId(ir.gen_label(), instr.mode)
-    lbl_skip = m2_expr.ExprId(ir.get_next_label(instr), instr.mode)
-
-    e = [m2_expr.ExprAff(zf, m2_expr.ExprCond(b, m2_expr.ExprInt_from(zf, 0),
-                                              m2_expr.ExprInt_from(zf, 1)))]
-
-    e_do = []
-    e_do.append(m2_expr.ExprAff(a, m2_expr.ExprOp('bsr', b)))
-    e_do.append(m2_expr.ExprAff(ir.IRDst, lbl_skip))
-    e.append(m2_expr.ExprAff(ir.IRDst, m2_expr.ExprCond(b, lbl_do, lbl_skip)))
-    return e, [irbloc(lbl_do.name, [e_do])]
+    return bsr_bsf(ir, instr, a, b, "bsr")
 
 
 def arpl(ir, instr, a, b):
@@ -3506,8 +3515,9 @@ class ir_x86_16(ir):
 
         for b in extra_ir:
             for ir in b.irs:
-                for e in ir:
-                    e.src = e.src.replace_expr({lbl_next: lbl_end})
+                for i, e in enumerate(ir):
+                    src = e.src.replace_expr({lbl_next: lbl_end})
+                    ir[i] = m2_expr.ExprAff(e.dst, src)
         cond_bloc = []
         cond_bloc.append(m2_expr.ExprAff(c_reg,
                                          c_reg - m2_expr.ExprInt_from(c_reg,
@@ -3577,19 +3587,21 @@ class ir_x86_64(ir_x86_16):
 
     def mod_pc(self, instr, instr_ir, extra_ir):
         # fix RIP for 64 bit
-        for i, x in enumerate(instr_ir):
-            if x.dst != self.pc:
-                x.dst = x.dst.replace_expr(
+        for i, expr in enumerate(instr_ir):
+            dst, src = expr.dst, expr.src
+            if dst != self.pc:
+                dst = dst.replace_expr(
                     {self.pc: m2_expr.ExprInt64(instr.offset + instr.l)})
-            x = m2_expr.ExprAff(x.dst, x.src.replace_expr(
-                {self.pc: m2_expr.ExprInt64(instr.offset + instr.l)}))
-            instr_ir[i] = x
+            src = src.replace_expr(
+                {self.pc: m2_expr.ExprInt64(instr.offset + instr.l)})
+            instr_ir[i] = m2_expr.ExprAff(dst, src)
         for b in extra_ir:
             for irs in b.irs:
-                for i, x in enumerate(irs):
-                    if x.dst != self.pc:
+                for i, expr in enumerate(irs):
+                    dst, src = expr.dst, expr.src
+                    if dst != self.pc:
                         new_pc = m2_expr.ExprInt64(instr.offset + instr.l)
-                        x.dst = x.dst.replace_expr({self.pc: new_pc})
-                    x = m2_expr.ExprAff(x.dst, x.src.replace_expr(
-                        {self.pc: m2_expr.ExprInt64(instr.offset + instr.l)}))
-                    irs[i] = x
+                        dst = dst.replace_expr({self.pc: new_pc})
+                    src = src.replace_expr(
+                        {self.pc: m2_expr.ExprInt64(instr.offset + instr.l)})
+                    irs[i] = m2_expr.ExprAff(dst, src)
