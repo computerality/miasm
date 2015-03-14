@@ -91,8 +91,11 @@ class BoundedDict(UserDict.DictMixin):
                         self._delete_cb(key)
 
                 # Keep only the most @_min_size used
-                self._data = {key:self._data[key]
-                              for key in most_commons[:self._min_size - 1]}
+                self._data = {}
+                for key in most_commons[:self._min_size - 1]:
+                    self._data[key] = self._data[key]
+                #self._data = {key:self._data[key]
+                #              for key in most_commons[:self._min_size - 1]}
                 self._size = self._min_size
 
                 # Reset use's counter
