@@ -26,9 +26,10 @@ import miasm2.expression.expression as m2_expr
 
 # try importing OrderedDict with fallback for python2.6
 try:
-    from itertools import OrderedDict
+    from collections import OrderedDict
 except:
     from ordereddict import OrderedDict
+
 
 
 def parity(a):
